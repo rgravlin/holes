@@ -1,0 +1,70 @@
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+# Dev tools are pinned in tools/go.mod, outside the root go.mod, so the library
+# keeps zero dependencies for its importers.
+TOOL := "go tool -modfile=tools/go.mod"
+
+# Default recipe to list all recipes
+default:
+    @just --list
+
+# Build the CLI into bin/
+build:
+    go build -trimpath -o bin/holes ./cmd/holes
+
+# Run unit tests with the race detector
+test:
+    go test -race -count=1 ./...
+
+# Run each fuzz target in each package for FUZZTIME (default 30s). Listing a
+# package's targets is a separate statement so a build failure, or a package
+# with no targets, fails the recipe.
+fuzz FUZZTIME="30s":
+    for pkg in . ./cmd/holes; do targets="$(go test -list '^Fuzz' "$pkg" | grep '^Fuzz')"; for t in $targets; do go test -run='^$' -fuzz="^${t}\$" -fuzztime={{FUZZTIME}} "$pkg"; done; done
+
+# Tidy go.mod and go.sum, in the root and tools modules
+tidy:
+    go mod tidy
+    cd tools && go mod tidy
+
+# Update dependencies to their latest minor/patch versions, then tidy. The
+# root module has none today; the dev tools in tools/go.mod are updated too.
+modupdate:
+    go get -u -t ./...
+    go mod tidy
+    cd tools && go get -u tool && go mod tidy
+
+# Format code and apply go fix modernizers
+fmt:
+    go fix ./...
+    gofmt -w .
+
+# Lint (golangci-lint v2 with gosec)
+lint:
+    golangci-lint run
+
+# Scan for known vulnerabilities
+vuln:
+    {{TOOL}} govulncheck ./...
+
+# Scan for committed secrets
+secrets:
+    {{TOOL}} gitleaks dir . --no-banner
+
+# Lint the GitHub Actions workflows
+actionlint:
+    {{TOOL}} actionlint
+
+# Static checks: tidy go.mod (root and tools), vet, formatting, go fix modernizers
+verify:
+    go mod tidy -diff
+    cd tools && go mod tidy -diff
+    go vet ./...
+    test -z "$(gofmt -l .)"
+    test -z "$(go fix -diff ./...)"
+
+# Everything CI runs except golangci-lint, which CI runs through its action
+ci: verify vuln secrets actionlint test (fuzz "10s")
+
+# Everything CI runs, plus lint
+check: lint ci

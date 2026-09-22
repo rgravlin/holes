@@ -1,0 +1,23 @@
+version: "2"
+
+linters:
+  enable:
+    - errorlint
+    - gosec
+    - nolintlint
+  settings:
+    govet:
+      enable:
+        - shadow
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/rgravlin/holes
