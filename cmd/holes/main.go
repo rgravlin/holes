@@ -67,10 +67,8 @@ Examples:
 `
 
 type config struct {
-	// usage, when set, is printed instead of processing input (-h).
-	usage string
-	// version requests to print the version instead of processing input.
-	version bool
+	// output, when set, is printed instead of processing input (-h, -version).
+	output string
 
 	in     reader
 	opts   holes.Options
@@ -89,12 +87,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		return fail(stderr, err)
 	}
-	if cfg.usage != "" || cfg.version {
-		text := cfg.usage
-		if cfg.version {
-			text = version(debug.ReadBuildInfo()) + "\n"
-		}
-		if _, err = io.WriteString(stdout, text); err != nil {
+	if cfg.output != "" {
+		if _, err = io.WriteString(stdout, cfg.output); err != nil {
 			return fail(stderr, fmt.Errorf("write output: %w", err))
 		}
 		return exitNone
@@ -150,7 +144,7 @@ type flags struct {
 
 func parseArgs(args []string) (config, error) {
 	fs := flag.NewFlagSet("holes", flag.ContinueOnError)
-	// run reports errors once; help goes to stdout via config.usage.
+	// run reports errors once; help goes to stdout via config.output.
 	fs.SetOutput(io.Discard)
 
 	var f flags
@@ -179,13 +173,13 @@ func parseArgs(args []string) (config, error) {
 		b.WriteString("\nFlags:\n")
 		fs.SetOutput(&b)
 		fs.PrintDefaults()
-		return config{usage: b.String()}, nil
+		return config{output: b.String()}, nil
 	}
 	if err != nil {
 		return config{}, fmt.Errorf("%w\nrun 'holes -h' for usage", err)
 	}
 	if f.version {
-		return config{version: true}, nil
+		return config{output: version(debug.ReadBuildInfo()) + "\n"}, nil
 	}
 	return f.config(fs.Args())
 }
@@ -300,7 +294,7 @@ func (r reader) values(line string) iter.Seq[string] {
 
 func (r reader) readAll(files []string, stdin io.Reader) ([]int64, error) {
 	if len(files) == 0 {
-		return r.read(nil, stdin, "stdin")
+		files = []string{"-"}
 	}
 	var ps []int64
 	for _, name := range files {
@@ -317,24 +311,20 @@ func (r reader) readAll(files []string, stdin io.Reader) ([]int64, error) {
 	return ps, nil
 }
 
-func (r reader) readFile(ps []int64, name string) (_ []int64, err error) {
+func (r reader) readFile(ps []int64, name string) ([]int64, error) {
 	f, err := os.Open(name) //nolint:gosec // G304: reading files named on the command line is the point.
 	if err != nil {
-		return nil, err // *os.PathError already names the operation and file.
+		return nil, err // *os.PathError names the operation and file, here and from Close.
 	}
-	defer func() {
-		if cerr := f.Close(); cerr != nil {
-			err = errors.Join(err, fmt.Errorf("close %s: %w", name, cerr))
-		}
-	}()
-	return r.read(ps, f, name)
+	ps, err = r.read(ps, f, name)
+	return ps, errors.Join(err, f.Close())
 }
 
 // read appends the position of every value in src to ps. A UTF-8
 // byte-order mark at the start of src is ignored.
 func (r reader) read(ps []int64, src io.Reader, name string) ([]int64, error) {
 	sc := bufio.NewScanner(src)
-	sc.Buffer(make([]byte, 0, 64*1024), maxLine)
+	sc.Buffer(nil, maxLine)
 	line := 0
 	for sc.Scan() {
 		line++
