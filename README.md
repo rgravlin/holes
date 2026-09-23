@@ -130,13 +130,31 @@ just lint        # golangci-lint
 just vuln        # govulncheck
 just secrets     # gitleaks
 just actionlint  # lint the GitHub Actions workflows
-just verify      # go.mod tidiness (root and tools), go vet, gofmt, go fix modernizers
+just verify      # go.mod tidiness (root and tools), no root dependencies, go vet, gofmt, go fix modernizers
 just ci          # everything CI runs except lint (CI lints through its own action)
 just check       # everything CI runs, plus lint
 just modupdate   # update dependencies, including the dev tools in tools/go.mod
 ```
 
 `holes` has no configuration beyond flags and no environment variables.
+
+## Workflow Diagram
+
+```mermaid
+flowchart TD
+    A["flags and file names"] --> B{"valid flags?"}
+    B -->|"-h or -version"| H["print usage or version"] --> OK["exit 0"]
+    B -->|no| ERR["error on stderr, exit 2"]
+    B -->|yes| R["read each file or stdin, line by line"]
+    R --> X["take each -e match (or its first group), else the whole line"]
+    X --> P["Int or Date Parse: value to int64 position"]
+    P -->|"bad value or I/O error"| ERR
+    P --> F["holes.Find: keep -from..-to, sort, drop duplicates, walk the gaps"]
+    F --> W["print every value, ranges (-r) or a count (-c); nothing with -q"]
+    W --> G{"any gaps?"}
+    G -->|yes| FOUND["exit 1"]
+    G -->|no| OK
+```
 
 ## License
 

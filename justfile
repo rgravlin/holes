@@ -55,9 +55,11 @@ secrets:
 actionlint:
     {{TOOL}} actionlint
 
-# Static checks: tidy go.mod (root and tools), vet, formatting, go fix modernizers
+# Static checks: tidy go.mod (root and tools), no root dependencies, vet,
+# formatting, go fix modernizers
 verify:
     go mod tidy -diff
+    test "$(go list -m all)" = github.com/rgravlin/holes
     cd tools && go mod tidy -diff
     go vet ./...
     test -z "$(gofmt -l .)"

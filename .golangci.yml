@@ -3,8 +3,12 @@ version: "2"
 linters:
   enable:
     - errorlint
+    - gocritic
+    - godot
     - gosec
+    - misspell
     - nolintlint
+    - revive
   settings:
     govet:
       enable:
