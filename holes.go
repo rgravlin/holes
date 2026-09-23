@@ -13,7 +13,7 @@ import (
 
 // ErrStep is returned by [Options.Validate] and [Find] when the step is
 // negative.
-var ErrStep = errors.New("step must be positive")
+var ErrStep = errors.New("step must not be negative")
 
 // ErrBounds is returned by [Options.Validate] and [Find] when From is greater
 // than To.
@@ -105,6 +105,8 @@ func gaps(ps []int64, step uint64, opts Options) []Gap {
 		// With no data, the bounds are the only positions known to be expected.
 		switch {
 		case opts.From != nil && opts.To != nil:
+			// Built by hand, not with run: Count saturates for the full int64
+			// range, and run would then place Last one position short.
 			n := dist(*opts.From, *opts.To) / step
 			out = append(out, Gap{First: *opts.From, Last: add(*opts.From, n*step), Step: int64(step), Count: satInc(n)}) //nolint:gosec // G115: step came from a positive int64.
 		case opts.From != nil:
