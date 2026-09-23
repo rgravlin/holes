@@ -29,8 +29,10 @@ tidy:
 
 # Update dependencies to their latest minor/patch versions, then tidy. The
 # root module has none today; the dev tools in tools/go.mod are updated too.
+# The toolchain line, which dev and CI build with, moves to the latest Go; the
+# go line, the minimum Go for importers, stays put.
 modupdate:
-    go get -u -t ./...
+    go get -u -t ./... toolchain@latest
     go mod tidy
     cd tools && go get -u tool && go mod tidy
 

@@ -32,6 +32,8 @@ which needs the range up front and only handles integers. `holes`:
 go install github.com/rgravlin/holes/cmd/holes@latest
 ```
 
+The CLI and library need Go 1.26 or later.
+
 ## Usage
 
 ```
@@ -118,8 +120,12 @@ range. See the [package docs](https://pkg.go.dev/github.com/rgravlin/holes).
 
 ## Development
 
-Requires Go 1.27.1+, [just](https://github.com/casey/just) and
-[golangci-lint](https://golangci-lint.run) v2.13.2. The other tools
+Requires [just](https://github.com/casey/just) and
+[golangci-lint](https://golangci-lint.run) v2.13.2. The `go` line in `go.mod`
+is the oldest Go supported; development and CI build with the newer Go on the
+`toolchain` line, which the `go` command downloads if needed and `just
+modupdate` moves to the latest release. `go vet` flags any language feature or
+standard library API newer than the `go` line. The other tools
 (govulncheck, gitleaks, actionlint) are pinned in `tools/go.mod`, outside the
 root module so the library stays dependency-free, and run with `go tool`.
 
