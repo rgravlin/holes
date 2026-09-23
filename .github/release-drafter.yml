@@ -1,0 +1,41 @@
+# Release Drafter keeps one draft release up to date as pull requests merge to
+# main. The version bump comes from the labels on the pull requests merged
+# since the last published release, highest wins: major, then minor or
+# enhancement, else patch.
+name-template: v$RESOLVED_VERSION
+tag-template: v$RESOLVED_VERSION
+categories:
+  - title: Features
+    semver-increment: minor
+    when:
+      label: enhancement
+  - title: Fixes
+    when:
+      label: bug
+  - title: Dependencies
+    collapse-after: 3
+    when:
+      label: dependencies
+  - title: Other changes
+  - type: version-resolver
+    semver-increment: major
+    when:
+      label: major
+  - type: version-resolver
+    semver-increment: minor
+    when:
+      label: minor
+  - type: version-resolver
+    semver-increment: patch
+change-template: "- $TITLE (#$NUMBER) $AUTHORS"
+change-title-escapes: '\<*_&'
+template: |
+  $CHANGES
+footer: |
+
+  ## Verify a download
+
+  ```sh
+  sha256sum --ignore-missing -c SHA256SUMS
+  gh attestation verify holes-linux-amd64 -R rgravlin/holes
+  ```

@@ -1,0 +1,78 @@
+name: Release
+
+# Every push to main updates one draft release: its notes and version come
+# from .github/release-drafter.yml, and its binaries are built from the pushed
+# commit. Publishing the draft creates the tag on that same commit.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+# One run at a time, so an older push never overwrites a newer draft.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # create and edit the draft release
+      pull-requests: read # read the labels of merged pull requests
+    outputs:
+      tag: ${{ steps.draft.outputs.tag_name }}
+    steps:
+      - id: draft
+        uses: release-drafter/release-drafter@34d80673e067bdc0c24568d3af899c216adcfaa9 # v7.7.0
+        with:
+          commitish: ${{ github.sha }}
+
+  build:
+    needs: draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write # upload assets to the draft release
+      id-token: write # sign the provenance attestation
+      attestations: write # store the provenance attestation
+    env:
+      TAG: ${{ needs.draft.outputs.tag }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false # release binaries never build from a restored cache
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
+        with:
+          just-version: 1.58.0
+      - name: Build
+        run: |
+          # A local tag makes Go stamp the release version into the binaries.
+          git tag "$TAG"
+          just dist
+          got="$(dist/holes-linux-amd64 -version)"
+          if [[ $got != "holes $TAG "* ]]; then
+            echo "::error::binaries report '$got', want $TAG; is the tree dirty?"
+            exit 1
+          fi
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: dist/SHA256SUMS
+      - name: Upload to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash # -o pipefail, so a failed release view fails the step
+        run: |
+          gh release upload "$TAG" dist/* --clobber
+          # Remove assets this build did not produce, e.g. a platform Go dropped.
+          gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r name; do
+            if [[ ! -e dist/$name ]]; then
+              gh release delete-asset "$TAG" "$name" --yes
+            fi
+          done

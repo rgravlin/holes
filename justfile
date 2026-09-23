@@ -12,6 +12,30 @@ default:
 build:
     go build -trimpath -o bin/holes ./cmd/holes
 
+# Cross-compile the CLI into dist/ for the released platforms, plus
+# SHA256SUMS. Other platforms can build from source with go install. The
+# binaries report the version of the tag on HEAD when the tree is clean, else
+# a pseudo-version.
+dist:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf dist
+    mkdir dist
+    for p in linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64 windows/arm64 freebsd/amd64 freebsd/arm64; do
+      os="${p%/*}"
+      arch="${p#*/}"
+      ext=""
+
+      if [[ $os == windows ]]; then
+        ext=.exe
+      fi
+
+      # GOARM only affects arm: ARMv6 runs on every Raspberry Pi, including
+      # the Zero and 1 that the default ARMv7 excludes.
+      CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOARM=6 go build -trimpath -o "dist/holes-$os-$arch$ext" ./cmd/holes
+    done
+    cd dist && sha256sum holes-* > SHA256SUMS
+
 # Run unit tests with the race detector
 test:
     go test -race -count=1 ./...

@@ -28,11 +28,59 @@ which needs the range up front and only handles integers. `holes`:
 
 ## Install
 
+Download the binary for your platform from the
+[latest release](https://github.com/rgravlin/holes/releases/latest). Assets
+are named `holes-<os>-<arch>` (`.exe` on Windows) for Linux (amd64, arm64,
+and arm for ARMv6 and later, including every Raspberry Pi), macOS (amd64,
+arm64), Windows (amd64, arm64) and FreeBSD (amd64, arm64).
+
+> [!NOTE]
+> The commands below use holes-linux-amd64; substitute your platform's asset
+
+### Latest Release
+```sh
+# download latest
+curl -fsSLO https://github.com/rgravlin/holes/releases/latest/download/holes-linux-amd64
+
+# download checksum
+curl -fsSLO https://github.com/rgravlin/holes/releases/latest/download/SHA256SUMS
+```
+
+### Versioned Release
+```sh
+# setup version
+VERSION=v1.0.0
+
+# download versioned binary
+curl -fsSLO "https://github.com/rgravlin/holes/releases/download/$VERSION/holes-linux-amd64"
+
+# download versioned checksum
+curl -fsSLO "https://github.com/rgravlin/holes/releases/download/$VERSION/SHA256SUMS"
+```
+
+### Final Steps
+```sh
+# validate checksums
+sha256sum --ignore-missing -c SHA256SUMS
+
+# optional: verify build provenance (needs gh)
+#gh attestation verify holes-linux-amd64 -R rgravlin/holes
+
+# make it executable and rename the binary
+chmod +x holes-linux-amd64 && mv holes-linux-amd64 holes
+```
+
+Then move `holes` to a directory on your `PATH` (`echo "$PATH"` lists them),
+or add its directory to `PATH`.
+
+On any other platform, or to build from source, use Go (`@v1.0.0` for a
+specific version):
+
 ```sh
 go install github.com/rgravlin/holes/cmd/holes@latest
 ```
 
-The CLI and library need Go 1.26 or later.
+The CLI and library need Go 1.26 or later to build.
 
 ## Usage
 
@@ -140,9 +188,27 @@ just verify      # go.mod tidiness (root and tools), no root dependencies, go ve
 just ci          # everything CI runs except lint (CI lints through its own action)
 just check       # everything CI runs, plus lint
 just modupdate   # update dependencies, including the dev tools in tools/go.mod
+just dist        # cross-compile the CLI for the released platforms into dist/, with SHA256SUMS
 ```
 
 `holes` has no configuration beyond flags and no environment variables.
+
+### Releasing
+
+Every merge to `main` updates a single draft release
+([release workflow](.github/workflows/release.yml)): release notes and the
+next version come from the merged pull requests
+([config](.github/release-drafter.yml)), and `just dist` builds the binaries
+from the merged commit, with signed build provenance, and attaches them. The
+version bump is the highest label among the pull requests merged since the
+last release: `major`, then `minor` or `enhancement`, else patch. Label a
+pull request before merging it: labels are read when the merge runs the
+workflow, so a label added later only counts from the next merge.
+
+To release, wait for the Release workflow on the latest merge to finish, then
+publish the draft. Publishing creates the tag on the commit the binaries were
+built from, so `go install ...@<tag>` and the binaries report the same
+version.
 
 ## Workflow Diagram
 
