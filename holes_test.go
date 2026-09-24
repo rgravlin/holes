@@ -3,6 +3,7 @@ package holes
 import (
 	"errors"
 	"math"
+	"math/rand/v2"
 	"slices"
 	"testing"
 )
@@ -218,4 +219,34 @@ func reference(in []int64, opts Options) []int64 {
 		}
 	}
 	return out
+}
+
+// BenchmarkFind runs Find on a million positions with about one in ten
+// missing, given in order and shuffled; sorting dominates the shuffled case.
+func BenchmarkFind(b *testing.B) {
+	r := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // G404: a fixed seed keeps benchmark inputs identical across runs.
+	var sorted []int64
+	for p := range int64(1_000_000) {
+		if r.IntN(10) != 0 {
+			sorted = append(sorted, p)
+		}
+	}
+	shuffled := slices.Clone(sorted)
+	r.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
+	for _, bb := range []struct {
+		name string
+		ps   []int64
+	}{
+		{name: "sorted", ps: sorted},
+		{name: "shuffled", ps: shuffled},
+	} {
+		b.Run(bb.name, func(b *testing.B) {
+			for b.Loop() {
+				if _, err := Find(bb.ps, Options{}); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
 }

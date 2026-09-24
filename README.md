@@ -174,12 +174,14 @@ is the oldest Go supported; development and CI build with the newer Go on the
 `toolchain` line, which the `go` command downloads if needed and `just
 modupdate` moves to the latest release. `go vet` flags any language feature or
 standard library API newer than the `go` line. The other tools
-(govulncheck, gitleaks, actionlint) are pinned in `tools/go.mod`, outside the
+(govulncheck, gitleaks, actionlint, benchstat) are pinned in `tools/go.mod`, outside the
 root module so the library stays dependency-free, and run with `go tool`.
 
 ```sh
 just test        # unit tests with -race
 just fuzz        # fuzz each target, library and CLI (default 30s)
+just bench       # run the benchmarks 10 times into bench.txt and summarize them
+just benchstat bench-old.txt bench.txt  # compare two bench runs
 just lint        # golangci-lint
 just vuln        # govulncheck
 just secrets     # gitleaks
@@ -190,6 +192,11 @@ just check       # everything CI runs, plus lint
 just modupdate   # update dependencies, including the dev tools in tools/go.mod
 just dist        # cross-compile the CLI for the released platforms into dist/, with SHA256SUMS
 ```
+
+To measure a performance change, run `just bench bench-old.txt` on the old
+code and `just bench` on the new, then `just benchstat bench-old.txt
+bench.txt`. Benchmark numbers depend on the machine, so compare only runs
+from the same machine; CI does not run or check them.
 
 `holes` has no configuration beyond flags and no environment variables.
 

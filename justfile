@@ -46,6 +46,18 @@ test:
 fuzz FUZZTIME="30s":
     for pkg in . ./cmd/holes; do targets="$(go test -list '^Fuzz' "$pkg" | grep '^Fuzz')"; for t in $targets; do go test -run='^$' -fuzz="^${t}\$" -fuzztime={{FUZZTIME}} "$pkg"; done; done
 
+# Run the benchmarks COUNT times into OUT (default bench.txt) and summarize
+# them. To measure a change, run this on the old and new code into different
+# files, then compare them with benchstat. Only compare runs from the same
+# machine: absolute numbers depend on the hardware.
+bench OUT="bench.txt" COUNT="10":
+    go test -run='^$' -bench=. -benchmem -count={{COUNT}} ./... | tee {{OUT}}
+    {{TOOL}} benchstat {{OUT}}
+
+# Compare two benchmark results saved by bench, e.g. just benchstat bench-old.txt bench.txt
+benchstat OLD NEW:
+    {{TOOL}} benchstat {{OLD}} {{NEW}}
+
 # Tidy go.mod and go.sum, in the root and tools modules
 tidy:
     go mod tidy

@@ -2,3 +2,4 @@
 .idea/
 /holes
 /dist/
+/bench*.txt
