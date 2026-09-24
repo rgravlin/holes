@@ -197,3 +197,35 @@ func FuzzDateRoundTrip(f *testing.F) {
 		}
 	})
 }
+
+func BenchmarkInt(b *testing.B) {
+	d := Int{Width: 8}
+	b.Run("Parse", func(b *testing.B) {
+		for b.Loop() {
+			if _, err := d.Parse("00123456"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("Format", func(b *testing.B) {
+		for b.Loop() {
+			d.Format(123456)
+		}
+	})
+}
+
+func BenchmarkDate(b *testing.B) {
+	d := Date{}
+	b.Run("Parse", func(b *testing.B) {
+		for b.Loop() {
+			if _, err := d.Parse("2026-09-22"); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	b.Run("Format", func(b *testing.B) {
+		for b.Loop() {
+			d.Format(20718)
+		}
+	})
+}

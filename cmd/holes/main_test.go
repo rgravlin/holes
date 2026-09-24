@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -12,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/rgravlin/holes"
 )
 
 func TestRun(t *testing.T) {
@@ -408,4 +411,45 @@ func fuzzRun(t *testing.T, args []string, stdin string) (status int, stdout, std
 		t.Fatalf("run(%q) status = %d, want 0, 1 or 2", args, status)
 	}
 	return status, stdout, stderr
+}
+
+// BenchmarkRun runs the CLI end to end. The read cases parse benchLines
+// sorted lines with about one value in ten missing, and print only the count
+// so that reading dominates. The print cases read nothing and print every
+// value from -from to -to.
+func BenchmarkRun(b *testing.B) {
+	const benchLines = 200_000
+	r := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // G404: a fixed seed keeps benchmark inputs identical across runs.
+	date := holes.Date{}
+	var ints, files, dates strings.Builder
+	for p := range int64(benchLines) {
+		if r.IntN(10) == 0 {
+			continue
+		}
+		fmt.Fprintf(&ints, "%d\n", p)
+		fmt.Fprintf(&files, "frame_%08d.exr\n", p)
+		fmt.Fprintf(&dates, "%s\n", date.Format(p))
+	}
+
+	for _, bb := range []struct {
+		name  string
+		args  []string
+		stdin string
+	}{
+		{name: "read int", args: []string{"-c"}, stdin: ints.String()},
+		{name: "read extract", args: []string{"-c", "-e", `frame_(\d+)\.exr`}, stdin: files.String()},
+		{name: "read date", args: []string{"-c", "-t", "date"}, stdin: dates.String()},
+		{name: "print int", args: []string{"-from", "0", "-to", strconv.Itoa(benchLines - 1)}},
+		{name: "print date", args: []string{"-t", "date", "-from", date.Format(0), "-to", date.Format(benchLines - 1)}},
+	} {
+		b.Run(bb.name, func(b *testing.B) {
+			b.SetBytes(int64(len(bb.stdin)))
+			var stderr bytes.Buffer
+			for b.Loop() {
+				if status := run(bb.args, strings.NewReader(bb.stdin), io.Discard, &stderr); status != exitFound {
+					b.Fatalf("run(%q) status = %d, want %d; stderr %q", bb.args, status, exitFound, stderr.String())
+				}
+			}
+		})
+	}
 }
